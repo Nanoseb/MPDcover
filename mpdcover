@@ -9,26 +9,43 @@ dossier=$HOME/.covers
 cover=/tmp/cover
 nocover=$HOME/Images/transparent.png
 
-info=$(mpc -f "%artist%+%album%" | head -n 1)
+info=$(mpc -f "%artist%+%album%" current | sed 's/\//+/g')
 
-if [ -n "$(grep "volume: " <<< $info)" ]
+# MPD is not playing ...
+if [ -z "$info" ] || [ "$info" = "error: Connection refused" ]
 then
     rm "$cover"
     ln -s "$nocover" "$cover"
     exit 1
 fi
 
-
 search=$(sed 's/\ /+/g' <<< "$info")
+
 
 if [ ! -e "$dossier/$search" ]
 then
-    imageurl=$(curl "http://www.albumart.org/index.php?searchkey=${search}&itempage=&newsearch=1&searchindex=Music"  | grep -m 1 "amazon" | awk -F"\"" '{print $14}')
 
+    page=$(curl "http://www.albumart.org/index.php?searchkey=${search}&itempage=&newsearch=1&searchindex=Music")
+
+    # curl can't connect to albumart.com
+    if [ "$?" = 6 ]
+    then
+        exit 2
+    fi
+
+    imageurl=$(grep -m 1 "amazon" <<< "$page" | awk -F"\"" '{print $14}')
+
+    # does albumart.com have this cover ?
     if [ -n "$imageurl" ]
     then
         curl -o "$dossier/$search" "$imageurl"
+    else
+        cp "$nocover" "$dossier/$search"
+        rm "$cover"
+        ln -s "$nocover" "$cover"
+        exit 0
     fi
+
 fi
 
 rm "$cover"
