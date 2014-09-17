@@ -1,0 +1,42 @@
+#!/bin/bash
+# Download album cover for mpd
+# needs mpc
+# Usage : add this to your conkyrc
+# ${execpi 5 /path/to/this/script}
+# ${image /tmp/cover -s 75x75}
+
+dossier=$HOME/.covers
+cover=/tmp/cover
+nocover=$HOME/Images/transparent.png
+
+info=$(mpc -f "%artist%+%album%" | head -n 1)
+
+if [ -n "$(grep "volume: " <<< $info)" ]
+then
+    rm "$cover"
+    ln -s "$nocover" "$cover"
+    exit 1
+fi
+
+
+search=$(sed 's/\ /+/g' <<< "$info")
+
+if [ ! -e "$dossier/$search" ]
+then
+    imageurl=$(curl "http://www.albumart.org/index.php?searchkey=${search}&itempage=&newsearch=1&searchindex=Music"  | grep -m 1 "amazon" | awk -F"\"" '{print $14}')
+
+    if [ -n "$imageurl" ]
+    then
+        curl -o "$dossier/$search" "$imageurl"
+    fi
+fi
+
+rm "$cover"
+if [ -e "$dossier/$search" ]
+then
+    ln -s "$dossier/$search" "$cover"
+else
+    ln -s "$nocover" "$cover"
+fi
+
+exit 0
